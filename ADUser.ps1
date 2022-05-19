@@ -1,5 +1,5 @@
 ﻿# ! Change it On Different campus (toro -- north york campus,miss -- Mississagua Campus)
-$OUPath = "OU=Student,DC=toro,DC=acumen,DC=local" 
+$OUPath = "OU=Student,DC=toro,DC=acumen,DC=local"  
 # * Initiate log user number
 $CreatedUser = 0
 $SkippedUser = 0
@@ -9,6 +9,8 @@ $CreatedGP = 0
 $FailedOU = 0
 
 $logfile = @()
+$passwordlist = @()
+
 # * Define Log type and warning level
 $Typelist = @{File = "File"; Create = "Create"; Remove = "Remove"; Move = "Move"; Set = "Set" }
 $levellist = @{Warning = "Warning"; Info = "Info"; Error = "Error" }
@@ -36,10 +38,11 @@ function Main() {
     catch {
         Write-Error "Failed to read from $filepath, exiting"
         Logging -Type $Typelist.File -Level $levellist.Error -Msg $_
-       
-        
+               
     }
     # For loop Each User data 
+    try{
+
     foreach ($u in $ADUsers) {
         # Get Student's Information 
         $OriName = $u.Name 
@@ -51,9 +54,10 @@ function Main() {
         $EmailAddress = $u.CAMP_EMAIL
         $Semester = $u.ACAD_PROG_PRIMARY.Substring($u.ACAD_PROG_PRIMARY.Length - 1)
         $Year = [int]$u.TERMDESC.split(' ')[1]
+        $Term = $u.TERMDESC.split(' ')[0]
 
         # Check OU based on student's program If doesn't exist will create
-        $OU, $Path = Check_OU -ProgramName $u.PROG_DESCR -Class $u.Class -Term $u.TERMDESC -Semester $Semester -Year $Year
+        $OU, $Path = Check_OU -ProgramName $u.PROG_DESCR -Class $u.Class -Term $Term -Semester $Semester -Year $Year
         
         # Get group format as "C2A"
         $Group = $OU.Substring(0, 1) + $Semester + $u.Class
@@ -64,7 +68,7 @@ function Main() {
         # Check if group exist
         Check_Group -GP_CSV $Group 
 
-        $Userpassword = Get_Password -Lastname $Lastname -SamAccountName $SamAccountName -BirthDay $BirthDay
+        $Userpassword = Get_Password -Lastname $Lastname -SamAccountName $SamAccountName -BirthDay $u.BIRTHDATE
 
         Write-Host "Beginning With $OriName"
         
@@ -88,15 +92,21 @@ function Main() {
         }
         else {
 
-            # ! Opotional If waould like to set Doamin user password 
-            Write-Host "The Account for $Name already exist. Skipped!"
+            Set_Password -SamAccountName $SamAccountName -Password $Userpassword
+            Write-Host "The Account for $Name already exist. Skipped! reset password to $Userpassword"
 
         }
         Write-Host "End With $OriName"        
     
     }
+    }catch{
+        Write-Host $Error[0]
+    }
+
     # Write-Host $OUGroup | Format-Table -AutoSizes
     $script:logfile | Out-File -FilePath .\Log.txt
+    $Script:passwordlist | Out-File -FilePath .\pwdlist.txt
+
 
 }
 function Get_Password() {
@@ -111,7 +121,8 @@ function Get_Password() {
     $LastPrefix = $Textinfo.ToTitleCase($Lastname.Substring(0, 2).ToLower())
     $FourID = $SamAccountName.Substring($length - 4)
     $LastFourBir = $BirthDay.substring(5).Replace("-", "")
-    $StuPassword = $LastPrefix + $FourID + $LastFourBir
+    # "56780211"
+    $StuPassword = $FourID + $LastFourBir
 
     return $StuPassword
 }
@@ -123,10 +134,15 @@ function Set_Password() {
         [Parameter(Mandatory = $true)] [string] $Password
     )
     try {
-        Set-ADAccountPassword -Identity $SamAccountName -Reset -NewPassword (ConvertTo-SecureString -AsPlainText $Password -Force) -ChangePasswordAtLogon $false
+        Set-ADAccountPassword -Identity $SamAccountName -Reset -NewPassword (ConvertTo-SecureString -AsPlainText $Password -Force)
+        # * Set password never expired and cannot change
+        Set-ADUser -Identity $SamAccountName -CannotChangePassword $true -PasswordNeverExpires $true
+        Write-Host "Set Password to $Userpassword"
+        $Script:passwordlist += "$SamAccountName $Password"
 
     }
     catch {
+        Write-Host $Error[0]
         Logging -Type $Typelist.Set -Level $levellist.Error -Msg "Failed to set password for $SamAccountName "
     }
 }
@@ -193,14 +209,15 @@ function Move_OU() {
 function Move_Group() {
     param (
         [Parameter(Mandatory = $true)] [string] $Sam,
-        [Parameter(Mandatory = $true)] [string] $OriGroup,
+        [Parameter(Mandatory = $false)] [string] $OriGroup,
         [Parameter(Mandatory = $true)] [string] $NewGroup
     )
-    $oldGroup = $OriGroup.Replace(" ", ",")
+    
     
     Add-ADGroupMember -Identity $NewGroup -Members $Sam
     Add-ADGroupMember -Identity Students -Members $Sam
     try {
+        $oldGroup = $OriGroup.Replace(" ", ",")
         Write-Host "Group Moved $Sam from $OriGroup to $NewGroup"
         Remove-ADGroupMember -Identity $oldGroup -Members $Sam -Confirm:$false 
         Logging -Type $Typelist.Remove -Level $levellist.Warning -Msg "Group Moved $Sam from $oldGroup to $NewGroup"
