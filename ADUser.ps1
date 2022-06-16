@@ -1,5 +1,6 @@
 ﻿# ! Change it On Different campus (toro -- north york campus,miss -- Mississagua Campus)
-$OUPath = "OU=Student,DC=toro,DC=acumen,DC=local"  
+$OUPath = "OU=Student,DC=xxx,DC=xxx,DC=xxx"  
+
 # * Initiate log user number
 $CreatedUser = 0
 $SkippedUser = 0
@@ -49,7 +50,7 @@ function Main() {
         $Lastname = $OriName.split(",")[0] 
         $Firstname = $OriName.split(",")[1] 
         $SamAccountName = "W0$($u.EMPLID)"
-        $UserPrincipalName = "$SamAccountName@$($u.CAMPUS).acumen.local"
+        $UserPrincipalName = "$SamAccountName@$($u.CAMPUS).domain.local"
         $DisplayName = "$Firstname $Lastname"
         $EmailAddress = $u.CAMP_EMAIL
         $Semester = $u.ACAD_PROG_PRIMARY.Substring($u.ACAD_PROG_PRIMARY.Length - 1)
