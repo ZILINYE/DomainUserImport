@@ -178,7 +178,7 @@ function AddADUser() {
         
         Write-Host "User $Name has been created!"
         Logging -Type $Typelist.Create -Level $levellist.Info -Msg "User $Name has been created!"
-        $script:CreatedUser ++
+        $script:CreatedUser += 1
     }
     catch {
 
