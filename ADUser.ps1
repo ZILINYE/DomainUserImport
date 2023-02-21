@@ -1,4 +1,4 @@
-﻿# ! Change it On Different campus (toro -- north york campus,miss -- Mississagua Campus)
+﻿# ! Change it On Different campus (toro -- north york campus,miss -- Mississagua Campus,bram -- Brampton Campus)
 $OUPath = "OU=Student,DC=xxx,DC=xxx,DC=xxx"  
 
 # * Initiate log user number
